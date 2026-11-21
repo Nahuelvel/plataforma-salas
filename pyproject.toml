@@ -1,0 +1,7 @@
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["B008", "E741", "E501"]  # B008: Depends() en argumentos es el patrón de FastAPI

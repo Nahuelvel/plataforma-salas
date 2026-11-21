@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block titulo %}Panel de administración{% endblock %}
+{% block contenido %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card mb-3"><div class="card-header">1 · Carga de datos</div><div class="card-body vstack gap-3">
+      <div><label class="form-label">salas.xlsx</label>
+        <div class="input-group"><input id="f_salas" type="file" class="form-control" accept=".xlsx,.csv"><button class="btn btn-outline-primary" onclick="subir('salas')">Subir</button></div></div>
+      <div><label class="form-label">secciones.xlsx · semestre</label>
+        <div class="input-group"><input id="semestre" class="form-control" style="max-width:110px" value="2026-1">
+        <input id="f_secciones" type="file" class="form-control" accept=".xlsx,.csv"><button class="btn btn-outline-primary" onclick="subir('secciones')">Subir</button></div></div>
+      <div id="carga_res"></div>
+    </div></div>
+    <div class="card"><div class="card-header">2 · Asignación</div><div class="card-body vstack gap-3">
+      <div><label class="form-label">Departamentos (separados por coma; vacío = todos)</label><input id="deptos" class="form-control" placeholder="ELECTRICA, GEOLOGIA"></div>
+      <div><label class="form-label">Peso λ de distancias (0 = Básico: solo aforo)</label><input id="lam" type="number" min="0" step="0.1" value="0" class="form-control"></div>
+      <button class="btn btn-primary" id="btn_run" onclick="lanzar()">Ejecutar asignación</button>
+      <div id="run_res"></div>
+    </div></div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card mb-3"><div class="card-header d-flex justify-content-between">3 · Resultado <a id="lnk_excel" class="btn btn-sm btn-success d-none">Exportar Excel</a></div>
+      <div class="card-body"><div id="indicadores" class="text-muted">Aún no hay corridas.</div></div></div>
+    <div class="card"><div class="card-header">Malla (sala × bloque) · color = aforo usado</div>
+      <div class="card-body overflow-auto"><div id="malla" class="small"></div>
+      <div class="small mt-2"><span class="badge" style="background:#198754">≥ 70 %</span> <span class="badge text-bg-warning">40–70 %</span> <span class="badge text-bg-danger">&lt; 40 %</span></div></div></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function subir(tipo) {
+  const f = document.getElementById("f_" + tipo).files[0];
+  if (!f) return alert("Elige un archivo");
+  const fd = new FormData(); fd.append("archivo", f);
+  const url = "/api/datos/" + tipo + (tipo === "secciones" ? "?semestre=" + encodeURIComponent(semestre.value) : "");
+  const r = await (await fetch(url, {method: "POST", body: fd})).json();
+  carga_res.innerHTML = r.ok
+    ? `<div class="alert alert-success mb-0">✔ ${r.filas_cargadas} filas de ${tipo} cargadas.</div>`
+    : `<div class="alert alert-danger mb-0"><b>Se rechazó la planilla (${tipo}).</b> Corrige y vuelve a cargar:<ul class="mb-0">` +
+      r.errores.map(e => `<li>${e.fila ? "Fila " + e.fila : "Planilla"}${e.columna ? ", columna «" + esc(e.columna) + "»" : ""}: ${esc(e.mensaje)}</li>`).join("") + "</ul></div>";
+}
+async function lanzar() {
+  btn_run.disabled = true; run_res.innerHTML = '<div class="alert alert-info mb-0">Calculando…</div>';
+  const body = {semestre: semestre.value, departamentos: deptos.value.split(",").map(s => s.trim()).filter(Boolean), lam: parseFloat(lam.value) || 0};
+  const r = await (await fetch("/api/corridas", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})).json();
+  const t = setInterval(async () => {
+    const c = await (await fetch("/api/corridas/" + r.id)).json();
+    if (c.estado === "en_curso") return;
+    clearInterval(t); btn_run.disabled = false; run_res.innerHTML = "";
+    mostrar(c);
+  }, 1500);
+}
+const fila = (n, v, b) => `<tr><td>${n}</td><td><b>${v ?? "–"}</b></td><td class="text-muted">${b ?? "–"}</td></tr>`;
+function mostrar(c) {
+  if (c.estado === "error" || c.estado === "infactible") { indicadores.innerHTML = `<div class="alert alert-danger">Corrida ${c.id}: ${c.estado}. ${esc(c.mensaje)}</div>`; return; }
+  const i = c.indicadores, b = c.indicadores_base || {};
+  indicadores.innerHTML = `<p>Corrida #${c.id} · estado <b>${c.estado}</b> · ${c.tiempo_s} s</p>
+   <table class="table table-sm"><thead><tr><th></th><th>Plataforma</th><th>Referencia (primera sala que cabe)</th></tr></thead><tbody>
+   ${fila("Asientos vacíos", i.asientos_vacios, b.asientos_vacios)}${fila("Aforo útil (%)", i.aforo_util_pct, b.aforo_util_pct)}
+   ${fila("Distancia promedio (m)", i.distancia_promedio, b.distancia_promedio)}${fila("Choques", i.choques, b.choques)}</tbody></table>`;
+  lnk_excel.href = `/api/corridas/${c.id}/excel`; lnk_excel.classList.remove("d-none");
+  const cols = [...new Set(c.malla.map(a => a.bloque))].sort(), salas = [...new Set(c.malla.map(a => a.sala))].sort();
+  const celda = {}; c.malla.forEach(a => celda[a.sala + "|" + a.bloque] = a);
+  const color = a => { const p = a.inscritos / a.capacidad; return p >= 0.7 ? "#198754;color:#fff" : p >= 0.4 ? "#ffc107" : "#dc3545;color:#fff"; };
+  malla.innerHTML = `<table class="table table-bordered table-sm text-nowrap"><thead><tr><th>Sala</th>${cols.map(x => `<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>` +
+    salas.map(s => `<tr><th>${esc(s)}</th>${cols.map(x => { const a = celda[s + "|" + x]; return a ? `<td style="background:${color(a)}">${esc(a.curso)}-${esc(a.seccion)}<br>${a.inscritos}/${a.capacidad}</td>` : "<td></td>"; }).join("")}</tr>`).join("") + "</tbody></table>";
+}
+(async () => { const l = await (await fetch("/api/corridas")).json(); if (l.length && l[0].estado !== "en_curso") mostrar(await (await fetch("/api/corridas/" + l[0].id)).json()); })();
+</script>
+{% endblock %}

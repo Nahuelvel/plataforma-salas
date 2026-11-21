@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block titulo %}Reportar falla · {{ sala }}{% endblock %}
+{% block contenido %}
+<div class="mx-auto" style="max-width:480px">
+  <h1 class="h4">¿Algo no funciona en la sala <span class="badge text-bg-primary">{{ sala }}</span>?</h1>
+  <p class="text-muted">Cuéntanos y avisamos al equipo técnico. No necesitas iniciar sesión.</p>
+  <form id="f" class="vstack gap-3">
+    <div><label class="form-label" for="categoria">Tipo de falla</label>
+      <select id="categoria" class="form-select" required>
+        <option value="" selected disabled>Elige una opción</option>
+        {% for c in categorias %}<option value="{{ c }}">{{ c.replace('_',' ').capitalize() }}</option>{% endfor %}
+      </select></div>
+    <div><label class="form-label" for="descripcion">Comentario (opcional)</label>
+      <textarea id="descripcion" class="form-control" rows="3" maxlength="1000"></textarea></div>
+    <button class="btn btn-primary btn-lg" type="submit">Enviar reporte</button>
+  </form>
+  <div id="msg" class="alert mt-3 d-none" role="status"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// Si no hay señal, el reporte se guarda en el navegador y se envía solo al volver la conexión.
+const SALA = {{ sala|tojson }}, CLAVE = "reportes_pendientes";
+const msg = (t, tipo) => { const m = document.getElementById("msg"); m.className = "alert mt-3 alert-" + tipo; m.textContent = t; };
+const pendientes = () => { try { return JSON.parse(localStorage.getItem(CLAVE) || "[]"); } catch { return []; } };
+const guardar = l => { try { localStorage.setItem(CLAVE, JSON.stringify(l)); } catch {} };
+async function enviar(r) {
+  const res = await fetch("/api/tickets", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(r)});
+  if (!res.ok && res.status >= 500) throw new Error("servidor");
+  return res.ok;
+}
+async function vaciarCola() {
+  const resto = [];
+  for (const r of pendientes()) { try { await enviar(r); } catch { resto.push(r); } }
+  guardar(resto);
+  return resto.length === 0;
+}
+window.addEventListener("online", async () => { if (pendientes().length && await vaciarCola()) msg("Se envió tu reporte pendiente. ¡Gracias!", "success"); });
+document.getElementById("f").addEventListener("submit", async e => {
+  e.preventDefault();
+  const r = {sala: SALA, categoria: categoria.value, descripcion: descripcion.value};
+  try { await enviar(r); msg("¡Listo! Avisamos al equipo técnico. Gracias.", "success"); e.target.reset(); }
+  catch { guardar([...pendientes(), r]); msg("Sin conexión: guardamos tu reporte y lo enviaremos apenas vuelva la señal.", "warning"); }
+});
+if (pendientes().length) vaciarCola();
+</script>
+{% endblock %}

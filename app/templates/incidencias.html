@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Mesa de incidencias{% endblock %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Mesa de incidencias</h1>
+  <select id="filtro" class="form-select w-auto"><option value="">Todos</option><option value="abierto">Abiertos</option><option value="en_curso">En curso</option><option value="resuelto">Resueltos</option></select>
+</div>
+<div class="table-responsive"><table class="table table-sm bg-white align-middle">
+  <thead><tr><th>#</th><th>Sala</th><th>Categoría</th><th>Comentario</th><th>Prioridad</th><th>Creado</th><th>Estado</th></tr></thead>
+  <tbody id="filas"></tbody>
+</table></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const ESTADOS = ["abierto", "en_curso", "resuelto"];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function cargar() {
+  const q = filtro.value ? "?estado=" + filtro.value : "";
+  const datos = await (await fetch("/api/tickets" + q)).json();
+  filas.innerHTML = datos.map(t => `<tr>
+    <td>${t.id}</td><td><b>${esc(t.sala)}</b></td><td>${esc(t.categoria)}</td><td>${esc(t.descripcion)}</td>
+    <td>${t.prioridad === "alta" ? '<span class="badge text-bg-danger">alta</span>' : '<span class="badge text-bg-secondary">normal</span>'}</td>
+    <td>${esc(t.creado.replace("T", " "))}</td>
+    <td><select class="form-select form-select-sm" data-id="${t.id}">${ESTADOS.map(e => `<option ${e === t.estado ? "selected" : ""}>${e}</option>`).join("")}</select></td></tr>`).join("");
+}
+filas.addEventListener("change", async e => {
+  await fetch("/api/tickets/" + e.target.dataset.id, {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({estado: e.target.value})});
+  cargar();
+});
+filtro.addEventListener("change", cargar);
+cargar(); setInterval(cargar, 5000);  // la mesa se actualiza sola: el ticket aparece en pocos segundos (CA-07)
+</script>
+{% endblock %}

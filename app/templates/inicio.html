@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1 class="h3">Asignación y reportes en salas</h1>
+<p class="text-muted">Prototipo (PMV): motor de asignación para Ingeniería Eléctrica y Geología + reportes por QR.</p>
+<div class="row g-3">
+  <div class="col-md-6"><div class="card h-100"><div class="card-body">
+    <h2 class="h5">Administración</h2><p>Cargar planillas, ejecutar la asignación y exportar la malla.</p><a class="btn btn-primary" href="/panel">Ir al panel</a>
+  </div></div></div>
+  <div class="col-md-6"><div class="card h-100"><div class="card-body">
+    <h2 class="h5">Soporte técnico</h2><p>Mesa de incidencias con los reportes enviados desde los QR.</p><a class="btn btn-outline-primary" href="/incidencias">Ir a la mesa</a>
+  </div></div></div>
+</div>
+<p class="mt-4 small text-muted">Documentación de la API: <a href="/docs">/docs</a></p>
+{% endblock %}

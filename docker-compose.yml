@@ -1,0 +1,22 @@
+# Todo corre en contenedores en una sola máquina (LLD): API + PostgreSQL.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: salas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-salas}
+      POSTGRES_DB: salas
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U salas"]
+      interval: 5s
+      retries: 10
+  api:
+    build: .
+    env_file: [.env]
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["8000:8000"]
+    restart: unless-stopped
+volumes:
+  pgdata:
