@@ -4,6 +4,7 @@
 ```bash
 git clone <URL-del-repo> && cd plataforma-salas
 make instalar && make test      # si pasan las pruebas, tu entorno está listo
+# Necesitas Python 3.12 o 3.13 (ver README si tienes otra versión)
 ```
 
 ## Flujo de trabajo (cada tarea)

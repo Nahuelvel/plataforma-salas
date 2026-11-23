@@ -13,7 +13,7 @@ Implementa el **LLD** del taller: motor de asignación de salas (CP-SAT) para In
 ## Probarlo en 2 minutos (sin Docker)
 
 ```bash
-make instalar          # crea .venv e instala dependencias (Python 3.12+)
+make instalar          # crea .venv e instala dependencias (Python 3.12 o 3.13)
 make test              # 33 pruebas automáticas
 make correr            # http://localhost:8000  (usuario: admin / cambiar-esto)
 ```
@@ -22,6 +22,16 @@ make correr            # http://localhost:8000  (usuario: admin / cambiar-esto)
 2. Pulsa **Ejecutar asignación** → ves malla, indicadores y la comparación contra «primera sala donde cabe». **Exportar Excel** descarga la malla.
 3. Sube una planilla con un error (capacidad negativa, horario mal escrito…) y verás el mensaje con **fila y columna**.
 4. Abre **/r/E-101** en el celular (o `GET /api/salas/E-101/qr.png` para ver el QR) → envía un reporte → aparece en **/incidencias** (usuario `soporte`).
+
+> **Versión de Python:** usa **3.12 o 3.13**. Con 3.14 o superior `pip` falla con «No matching distribution found for ortools», porque OR-Tools aún no publica paquetes para esas versiones. Si tu sistema trae otra, instala `uv` y usa `uv venv --python 3.13 .venv`.
+>
+> **Windows** (no tiene `make`):
+> ```powershell
+> python -m venv .venv
+> .venv\Scripts\pip install -r requirements-dev.txt
+> .venv\Scripts\python -m pytest
+> .venv\Scripts\uvicorn app.main:app --reload
+> ```
 
 Con Docker (API + PostgreSQL): `cp .env.example .env`, cambia las contraseñas y `docker compose up --build`.
 
