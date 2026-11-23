@@ -13,8 +13,8 @@ from .solver import resolver
 def main() -> None:
     p = json.load(sys.stdin)
     salas, secciones = p["salas"], p["secciones"]
-    res = resolver(salas, secciones, p.get("lam", 0.0), p.get("max_segundos", 60.0), p.get("hilos", 8), p.get("fijas"))
-    res["indicadores_base"] = calcular(salas, secciones, primera_sala_que_cabe(salas, secciones))
+    res = resolver(salas, secciones, p.get("lam", 0.0), p.get("max_segundos", 60.0), p.get("hilos", 8), p.get("fijas"), p.get("traslados"))
+    res["indicadores_base"] = calcular(salas, secciones, primera_sala_que_cabe(salas, secciones), p.get("traslados"))
     json.dump(res, sys.stdout)
 
 

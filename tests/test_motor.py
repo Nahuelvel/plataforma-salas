@@ -18,7 +18,8 @@ def cargar_ejemplo(carpeta=EJEMPLO):
     for s in secs:
         s["bloques"] = parsear_horario(s["horario"])
         s["curso"], s["seccion"] = str(s["curso"]), str(s["seccion"])
-    return salas, secs
+    traslados = [(r["edificio_a"], r["edificio_b"], r["minutos"]) for r in pd.read_excel(carpeta / "traslados.xlsx").to_dict("records")]
+    return salas, secs, traslados
 
 
 @pytest.fixture(scope="module")
@@ -28,8 +29,8 @@ def caso():
 
 def test_pa01_capacidad_y_choques(caso):
     """CA-01 y CA-02: verificación independiente de `calcular` (revisa la tabla fila por fila)."""
-    salas, secs = caso
-    res = resolver(salas, secs, lam=0, max_segundos=30)
+    salas, secs, tr = caso
+    res = resolver(salas, secs, lam=0, max_segundos=30, traslados=tr)
     assert res["estado"] in ("optima", "factible")
     asign = res["asignacion"]
     assert len(asign) == len(secs), "todas las secciones deben quedar asignadas"
@@ -51,31 +52,31 @@ def test_pa01_capacidad_y_choques(caso):
 
 def test_pa02_aforo_contra_referencia(caso):
     """CA-03 (versión automática): contra «primera sala donde cabe». La prueba real usa la asignación manual (scripts/comparar_manual.py)."""
-    salas, secs = caso
-    base = calcular(salas, secs, primera_sala_que_cabe(salas, secs))
-    res = resolver(salas, secs, lam=0, max_segundos=30)["indicadores"]
+    salas, secs, tr = caso
+    base = calcular(salas, secs, primera_sala_que_cabe(salas, secs), tr)
+    res = resolver(salas, secs, lam=0, max_segundos=30, traslados=tr)["indicadores"]
     mejora = 100 * (base["asientos_vacios"] - res["asientos_vacios"]) / base["asientos_vacios"]
     print(f"PA-02: {base['asientos_vacios']} → {res['asientos_vacios']} asientos vacíos ({mejora:.1f}% menos)")
     assert mejora >= 15 and res["aforo_util_pct"] > base["aforo_util_pct"]
 
 
-def test_pa03_distancia_con_lambda(caso):
-    """CA-04: con λ > 0 baja la distancia promedio y los asientos vacíos suben poco."""
-    salas, secs = caso
-    a = resolver(salas, secs, lam=0, max_segundos=30)["indicadores"]
-    b = resolver(salas, secs, lam=0.03, max_segundos=30)["indicadores"]
-    print(f"PA-03: distancia {a['distancia_promedio']} → {b['distancia_promedio']} m; asientos {a['asientos_vacios']} → {b['asientos_vacios']}")
-    assert b["distancia_promedio"] <= 0.9 * a["distancia_promedio"]
+def test_pa03_traslado_con_lambda(caso):
+    """CA-04: con λ > 0 baja el tiempo de traslado promedio y los asientos vacíos suben poco."""
+    salas, secs, tr = caso
+    a = resolver(salas, secs, lam=0, max_segundos=30, traslados=tr)["indicadores"]
+    b = resolver(salas, secs, lam=1, max_segundos=30, traslados=tr)["indicadores"]
+    print(f"PA-03: traslado {a['traslado_promedio_min']} → {b['traslado_promedio_min']} min; asientos {a['asientos_vacios']} → {b['asientos_vacios']}")
+    assert b["traslado_promedio_min"] <= 0.9 * a["traslado_promedio_min"]
     assert b["asientos_vacios"] <= 1.05 * a["asientos_vacios"]
     assert b["choques"] == 0
 
 
 def test_pa04_tiempo_de_calculo(caso):
     """CA-05: 5 corridas del caso base, cada una ≤ 60 s."""
-    salas, secs = caso
+    salas, secs, tr = caso
     for _ in range(5):
         t0 = time.perf_counter()
-        res = resolver(salas, secs, lam=0.03, max_segundos=60)
+        res = resolver(salas, secs, lam=1, max_segundos=60, traslados=tr)
         assert res["estado"] in ("optima", "factible")
         assert time.perf_counter() - t0 <= 60
 
@@ -84,17 +85,17 @@ def test_pa04_escala_x3_informativa(tmp_path):
     """Caso 3 veces más grande: el límite de tiempo debe entregar al menos una solución factible."""
     from scripts.generar_datos_ejemplo import generar
     generar(tmp_path, factor=3)
-    salas, secs = cargar_ejemplo(tmp_path)
-    res = resolver(salas, secs, lam=0.03, max_segundos=10)
+    salas, secs, tr = cargar_ejemplo(tmp_path)
+    res = resolver(salas, secs, lam=1, max_segundos=10, traslados=tr)
     print(f"escala x3: {len(secs)} secciones → {res['estado']} en {res['tiempo_s']} s")
     assert res["estado"] in ("optima", "factible") and res["indicadores"]["choques"] == 0
 
 
 def test_sala_fija_se_respeta(caso):
-    salas, secs = caso
+    salas, secs, tr = caso
     k = clave(secs[0])
     cod = next(s["codigo"] for s in salas if s["tipo"] == secs[0]["tipo_sala"] and s["capacidad"] >= secs[0]["inscritos"])
-    res = resolver(salas, secs, max_segundos=20, fijas={k: cod})
+    res = resolver(salas, secs, max_segundos=20, fijas={k: cod}, traslados=tr)
     assert res["asignacion"][k] == cod
 
 

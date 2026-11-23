@@ -20,8 +20,16 @@ class Edificio(Base):
     __tablename__ = "edificio"
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre: Mapped[str] = mapped_column(String(80), unique=True)
-    x: Mapped[float] = mapped_column(Float, default=0.0)
-    y: Mapped[float] = mapped_column(Float, default=0.0)
+
+
+class Traslado(Base):
+    """Minutos caminando entre dos edificios (simétrico: se guarda una sola vez por par)."""
+    __tablename__ = "traslado"
+    __table_args__ = (UniqueConstraint("edificio_a_id", "edificio_b_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    edificio_a_id: Mapped[int] = mapped_column(ForeignKey("edificio.id"))
+    edificio_b_id: Mapped[int] = mapped_column(ForeignKey("edificio.id"))
+    minutos: Mapped[float] = mapped_column(Float)
 
 
 class Sala(Base):

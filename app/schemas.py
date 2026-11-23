@@ -21,8 +21,6 @@ class SalaIn(BaseModel):
     piso: int
     capacidad: int = Field(gt=0)
     tipo: TipoSala
-    edificio_x: float | None = None  # metros; opcional (sin coordenadas, la distancia solo cuenta pisos)
-    edificio_y: float | None = None
 
     _t = field_validator("tipo", mode="before")(_norm_tipo)
 
@@ -55,6 +53,17 @@ class SeccionIn(BaseModel):
         return v
 
 
+class TrasladoIn(BaseModel):
+    edificio_a: str = Field(min_length=1, max_length=80)
+    edificio_b: str = Field(min_length=1, max_length=80)
+    minutos: float = Field(ge=0, le=120)
+
+    @field_validator("edificio_a", "edificio_b", mode="before")
+    @classmethod
+    def _txt(cls, v):
+        return str(v).strip() if v is not None else v
+
+
 class ErrorFila(BaseModel):
     fila: int | None  # fila de la planilla (la 1 es el encabezado); None si el error es de toda la planilla
     columna: str | None
@@ -71,7 +80,7 @@ class ResultadoCarga(BaseModel):
 class CorridaIn(BaseModel):
     semestre: str = Field(min_length=1, max_length=10)
     departamentos: list[str] = Field(default_factory=list, description="Vacío = todos")
-    lam: float = Field(default=0.0, ge=0, description="λ: 0 = plan Básico (solo aforo); >0 = plan Pro (aforo + distancias)")
+    lam: float = Field(default=0.0, ge=0, description="λ (asientos vacíos que se acepta pagar por ahorrar 1 minuto de traslado): 0 = plan Básico (solo aforo); >0 = plan Pro (aforo + tiempos de traslado)")
     max_segundos: float | None = Field(default=None, gt=0, le=600)
     fijas: dict[str, str] = Field(default_factory=dict, description='Fija una sala: {"CURSO-SEC": "COD_SALA"}')
 

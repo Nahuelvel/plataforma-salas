@@ -18,6 +18,7 @@ Estudiante / profesor (celular + QR) ──HTTPS──▶   │  valida con Pyda
 | Método | Ruta | Acceso | Qué hace |
 |---|---|---|---|
 | POST | `/api/datos/salas` | admin | Carga y valida salas (upsert por código) |
+| POST | `/api/datos/traslados` | admin | Carga y valida minutos entre edificios (reemplaza la tabla; requiere salas) |
 | POST | `/api/datos/secciones?semestre=` | admin | Carga y valida secciones (reemplaza ese semestre) |
 | POST | `/api/corridas` | admin | Lanza una optimización |
 | GET | `/api/corridas/{id}` | admin | Estado, indicadores y malla |

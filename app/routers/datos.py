@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..auth import solo_administracion
 from ..db import get_db
 from ..engine.horario import parsear_horario
-from ..models import Edificio, Sala, Seccion
+from ..models import Edificio, Sala, Seccion, Traslado
 from ..schemas import ErrorFila, ResultadoCarga
 from ..validacion import leer_planilla, validar
 
@@ -32,10 +32,8 @@ async def cargar_salas(archivo: UploadFile = File(...), db: Session = Depends(ge
     for m in validas:
         e = edificios.get(m.edificio)
         if e is None:
-            e = edificios[m.edificio] = Edificio(nombre=m.edificio, x=m.edificio_x or 0.0, y=m.edificio_y or 0.0)
+            e = edificios[m.edificio] = Edificio(nombre=m.edificio)
             db.add(e)
-        elif m.edificio_x is not None:
-            e.x, e.y = m.edificio_x, m.edificio_y
         db.flush()
         sala = db.scalar(select(Sala).where(Sala.codigo == m.codigo))
         if sala is None:  # upsert por código: los tickets guardados siguen apuntando a su sala
@@ -62,5 +60,25 @@ async def cargar_secciones(semestre: str = Query(..., min_length=1, max_length=1
     for m in validas:
         db.add(Seccion(semestre=semestre, curso=m.curso, seccion=m.seccion, departamento=m.departamento, inscritos=m.inscritos,
                        nivel=m.nivel, tipo_sala=m.tipo_sala, bloques=parsear_horario(m.horario)))
+    db.commit()
+    return ResultadoCarga(ok=True, filas_leidas=len(df), filas_cargadas=len(validas))
+
+
+@router.post("/traslados", response_model=ResultadoCarga)
+async def cargar_traslados(archivo: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Minutos caminando entre edificios: ``edificio_a · edificio_b · minutos``. Reemplaza la tabla completa."""
+    df, falla = _leer(archivo, await archivo.read())
+    if falla:
+        return falla
+    por_nombre = {e.nombre: e for e in db.scalars(select(Edificio))}
+    if not por_nombre:
+        return ResultadoCarga(ok=False, filas_leidas=len(df), errores=[ErrorFila(fila=None, columna=None, mensaje="primero cargue las salas")])
+    validas, errores = validar("traslados", df, edificios=set(por_nombre))
+    if errores:
+        return ResultadoCarga(ok=False, filas_leidas=len(df), errores=errores)
+    db.execute(delete(Traslado))
+    for m in validas:
+        a, b = sorted((por_nombre[m.edificio_a], por_nombre[m.edificio_b]), key=lambda e: e.id)
+        db.add(Traslado(edificio_a_id=a.id, edificio_b_id=b.id, minutos=m.minutos))
     db.commit()
     return ResultadoCarga(ok=True, filas_leidas=len(df), filas_cargadas=len(validas))
