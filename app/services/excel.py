@@ -9,7 +9,7 @@ from ..models import Corrida
 INDICADORES = {
     "asientos_vacios": "Asientos vacíos",
     "aforo_util_pct": "Aforo útil (%)",
-    "distancia_promedio": "Distancia promedio entre clases consecutivas (m)",
+    "traslado_promedio_min": "Tiempo de traslado promedio entre clases consecutivas (min)",
     "choques": "Choques sala-bloque",
     "violaciones_capacidad": "Violaciones de capacidad/tipo",
     "secciones_sin_asignar": "Secciones sin asignar",

@@ -7,11 +7,11 @@ from tests.conftest import ADMIN, SOPORTE, correr
 
 
 def test_flujo_completo(cargado):
-    c = correr(cargado, departamentos=["ELECTRICA", "GEOLOGIA"], lam=0.03)
+    c = correr(cargado, departamentos=["ELECTRICA", "GEOLOGIA"], lam=1)
     assert c["estado"] in ("optima", "factible")
     assert c["indicadores"]["choques"] == 0 and c["indicadores"]["violaciones_capacidad"] == 0
     assert c["indicadores"]["asientos_vacios"] < c["indicadores_base"]["asientos_vacios"]
-    assert c["parametros"]["lam"] == 0.03  # la corrida guarda sus parámetros para repetirla
+    assert c["parametros"]["lam"] == 1  # la corrida guarda sus parámetros para repetirla
     assert len(c["malla"]) > 0
 
     r = cargado.get(f"/api/corridas/{c['id']}/excel", headers=ADMIN)
@@ -42,3 +42,13 @@ def test_soporte_no_accede_al_panel_ni_a_los_datos(cargado):
 
 def test_credenciales_incorrectas(client):
     assert client.get("/incidencias", auth=("admin", "mala")).status_code == 401
+
+
+def test_faltan_traslados_se_avisa(client):
+    """Con λ > 0 y un par de edificios sin tiempo declarado, la corrida avisa y usa el valor por defecto."""
+    from tests.conftest import EJEMPLO, subir
+    assert subir(client, "salas", (EJEMPLO / "salas.xlsx").read_bytes()).json()["ok"]
+    assert subir(client, "secciones", (EJEMPLO / "secciones.xlsx").read_bytes()).json()["ok"]
+    c = correr(client, lam=1)
+    assert c["estado"] in ("optima", "factible") and "Faltan tiempos de traslado" in c["mensaje"]
+    assert "Faltan" not in correr(client, lam=0)["mensaje"]  # con λ = 0 los traslados no importan

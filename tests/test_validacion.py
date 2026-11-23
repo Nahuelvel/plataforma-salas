@@ -70,3 +70,36 @@ def test_csv_tambien_se_acepta(client):
 def test_carga_exige_rol_administracion(client):
     r = client.post("/api/datos/salas", files={"archivo": ("s.xlsx", xlsx(SALAS_OK))})
     assert r.status_code == 401
+
+
+# ---- traslados.xlsx (minutos entre edificios) ----
+TR_OK = pd.DataFrame({"edificio_a": ["A"], "edificio_b": ["B"], "minutos": [4]})
+SALAS_2_EDIF = pd.DataFrame({"codigo_sala": ["A-1", "B-1"], "edificio": ["A", "B"], "piso": [1, 1], "capacidad": [40, 40], "tipo": ["catedra", "catedra"]})
+TRASLADOS_MALOS = [
+    ("columna faltante", TR_OK.drop(columns=["minutos"]), 1, "minutos"),
+    ("minutos negativos", mod(TR_OK, 0, "minutos", -3), 2, "minutos"),
+    ("minutos no numéricos", mod(TR_OK, 0, "minutos", "rápido"), 2, "minutos"),
+    ("mismo edificio", mod(TR_OK, 0, "edificio_b", "A"), 2, "edificio_b"),
+    ("edificio inexistente", mod(TR_OK, 0, "edificio_b", "Z"), 2, "edificio_b"),
+    ("par repetido (también al revés)", pd.DataFrame({"edificio_a": ["A", "B"], "edificio_b": ["B", "A"], "minutos": [4, 4]}), 3, "edificio_b"),
+]
+
+
+@pytest.fixture()
+def con_edificios(client):
+    assert subir(client, "salas", xlsx(SALAS_2_EDIF)).json()["ok"]
+    return client
+
+
+@pytest.mark.parametrize("nombre,df,fila,col", TRASLADOS_MALOS, ids=[c[0] for c in TRASLADOS_MALOS])
+def test_traslados_con_error_se_rechazan(con_edificios, nombre, df, fila, col):
+    r = subir(con_edificios, "traslados", xlsx(df)).json()
+    assert r["ok"] is False and any(e["fila"] == fila and e["columna"] == col for e in r["errores"]), r["errores"]
+
+
+def test_traslados_correctos_se_aceptan(con_edificios):
+    assert subir(con_edificios, "traslados", xlsx(TR_OK)).json()["filas_cargadas"] == 1
+
+
+def test_traslados_exigen_salas_primero(client):
+    assert subir(client, "traslados", xlsx(TR_OK)).json()["ok"] is False

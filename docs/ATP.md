@@ -7,7 +7,7 @@ Fuente: PDF «Diseño de Detalle (LLD) y Proceso de Aceptación (ATP)» del tall
 | CA-01 | Respeta la capacidad | 0 violaciones | PA-01 | `test_pa01` | — |
 | CA-02 | Sin choques | 0 choques | PA-01 | `test_pa01` | — |
 | CA-03 | Mejora el aforo útil | ≥ 15 % menos asientos vacíos vs manual | PA-02 | vs «primera sala» | `scripts.comparar_manual` con la asignación real |
-| CA-04 | Reduce traslados | ≥ 10 % menos distancia, asientos vacíos ≤ +5 % | PA-03 | `test_pa03` | idem con datos reales |
+| CA-04 | Reduce traslados | ≥ 10 % menos **tiempo de traslado** (minutos; en el LLD decía «distancia»), asientos vacíos ≤ +5 % | PA-03 | `test_pa03` | idem con datos reales |
 | CA-05 | Responde rápido | ≤ 60 s en 5/5 corridas | PA-04 | `test_pa04` | repetir en la VM de 2 vCPU / 4 GB |
 | CA-06 | Valida los datos | 10/10 planillas rechazadas con fila y columna | PA-05 | `tests/test_validacion.py` | probar con planillas reales de la secretaría |
 | CA-07 | Reporte QR funciona | ≥ 19/20 lecturas; ticket en ≤ 10 s | PA-07 | flujo API | 20 lecturas con Android + iOS, wifi y datos |

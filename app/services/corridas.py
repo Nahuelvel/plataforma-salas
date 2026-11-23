@@ -8,11 +8,12 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from ..config import settings
 from ..engine.horario import DIAS
-from ..models import Asignacion, Corrida, Sala, Seccion
+from ..engine.traslado import DEFECTO_MIN, pares_faltantes, tabla
+from ..models import Asignacion, Corrida, Edificio, Sala, Seccion, Traslado
 
 log = logging.getLogger("corridas")
 RAIZ = Path(__file__).resolve().parents[2]  # raíz del repo, para que «-m app.engine.runner» funcione desde cualquier carpeta
@@ -20,8 +21,7 @@ RAIZ = Path(__file__).resolve().parents[2]  # raíz del repo, para que «-m app.
 
 def datos_para_motor(db: Session, semestre: str, departamentos: list[str]):
     salas = [
-        {"codigo": s.codigo, "edificio": s.edificio.nombre, "edificio_x": s.edificio.x, "edificio_y": s.edificio.y,
-         "piso": s.piso, "capacidad": s.capacidad, "tipo": s.tipo}
+        {"codigo": s.codigo, "edificio": s.edificio.nombre, "piso": s.piso, "capacidad": s.capacidad, "tipo": s.tipo}
         for s in db.scalars(select(Sala))
     ]
     q = select(Seccion).where(Seccion.semestre == semestre)
@@ -32,7 +32,10 @@ def datos_para_motor(db: Session, semestre: str, departamentos: list[str]):
          "nivel": s.nivel, "tipo_sala": s.tipo_sala, "bloques": s.bloques}
         for s in db.scalars(q)
     ]
-    return salas, secciones
+    ea, eb = aliased(Edificio), aliased(Edificio)
+    traslados = [(a, b, m) for a, b, m in db.execute(
+        select(ea.nombre, eb.nombre, Traslado.minutos).join(ea, ea.id == Traslado.edificio_a_id).join(eb, eb.id == Traslado.edificio_b_id))]
+    return salas, secciones, traslados
 
 
 def ejecutar_motor(payload: dict, timeout_extra: float = 30.0) -> dict:
@@ -53,7 +56,7 @@ def procesar_corrida(session_factory, corrida_id: int) -> None:
     try:
         c = db.get(Corrida, corrida_id)
         p = c.parametros
-        salas, secciones = datos_para_motor(db, c.semestre, p["departamentos"])
+        salas, secciones, traslados = datos_para_motor(db, c.semestre, p["departamentos"])
         if not secciones:
             c.estado, c.mensaje = "error", "No hay secciones cargadas para ese semestre/departamentos"
             db.commit()
@@ -61,9 +64,13 @@ def procesar_corrida(session_factory, corrida_id: int) -> None:
         # Los departamentos comparten salas: resolverlos por separado produciría choques entre ellos.
         # Por eso se resuelve junto todo lo seleccionado (el LLD escala eligiendo departamentos en cada corrida).
         res = ejecutar_motor({"salas": salas, "secciones": secciones, "lam": p["lam"], "max_segundos": p["max_segundos"],
-                              "hilos": settings.solver_hilos, "fijas": p.get("fijas") or None})
+                              "hilos": settings.solver_hilos, "fijas": p.get("fijas") or None, "traslados": traslados})
         asignacion, tiempo, estado = res["asignacion"], res["tiempo_s"], res["estado"]
         mensajes = [res["mensaje"]] if res["mensaje"] else []
+        if p["lam"] > 0:
+            faltan = pares_faltantes([s["edificio"] for s in salas], tabla(traslados))
+            if faltan:
+                mensajes.append("Faltan tiempos de traslado entre " + ", ".join(f"{a}–{b}" for a, b in faltan) + f" (se asumieron {DEFECTO_MIN:g} min)")
         indicadores, base_tot = res["indicadores"], res["indicadores_base"]
 
         sala_por_cod = {s["codigo"]: s for s in salas}

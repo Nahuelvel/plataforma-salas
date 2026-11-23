@@ -2,7 +2,7 @@
 
 Generado desde `docs/backlog.tsv`, que usa `scripts/setup_github.sh` para crear los issues en GitHub. **Una vez creados, el tablero de GitHub es la fuente de verdad.**
 
-Prioridad según el LLD: *must* = CA-01, 02, 05, 06 y salida legible; *should* = distancias (plan Pro) y usabilidad; *could* = módulo QR.
+Prioridad según el LLD: *must* = CA-01, 02, 05, 06 y salida legible; *should* = traslados (plan Pro) y usabilidad; *could* = módulo QR.
 
 ## 1 · PMV (motor y panel)
 
@@ -17,10 +17,12 @@ Prioridad según el LLD: *must* = CA-01, 02, 05, 06 y salida legible; *should* =
 
 - **[B1] Conseguir datos reales de Eléctrica y Geología (salas, secciones, asignación manual)** `must,B1,datos`  
   Pedir a la secretaría docente las planillas del semestre y la asignación manual real (pregunta abierta del LLD). Guardarlas fuera del repo. Sin la asignación manual, PA-02 usa «primera sala donde cabe». Criterio: CA-03, CA-04.
-- **[B1] Levantar coordenadas reales de los edificios (x, y en metros)** `should,B1,datos`  
-  Completar edificio_x/edificio_y en salas.xlsx para que la distancia entre salas sea real. Sin esto λ solo ve pisos. Criterio: CA-04.
+- **[B1] Medir los tiempos de traslado reales entre edificios** `should,B1,datos`  
+  Caminar entre cada par de edificios a paso normal en horario de clases y completar traslados.xlsx (edificio_a, edificio_b, minutos). Sin esto λ asume 5 min. Criterio: CA-04.
 - **[B2] Calibrar λ con datos reales** `should,B2`  
-  Con datos reales, barrer λ (0.01–0.1) y elegir el que cumpla CA-04 (≥10 % menos distancia, asientos vacíos ≤ +5 %). Documentar el valor en el README. Usar scripts/comparar_manual.py.
+  Con datos reales, barrer λ (≈ 0.5–3 asientos por minuto) y elegir el que cumpla CA-04 (≥10 % menos tiempo de traslado, asientos vacíos ≤ +5 %). Documentar el valor en el README. Usar scripts/comparar_manual.py.
+- **[ATP] Acordar con la secretaría que CA-04 se mida en minutos de traslado** `must,atp`  
+  El criterio se acordó como «≥ 10 % menos distancia». Pasamos a tiempo de traslado: dejar la nueva redacción confirmada con el usuario y los profesores antes de ejecutar PA-03.
 
 ## 3 · Aceptación (ATP)
 

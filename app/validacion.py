@@ -5,10 +5,11 @@ from collections import Counter
 import pandas as pd
 from pydantic import ValidationError
 
-from .schemas import ErrorFila, SalaIn, SeccionIn
+from .schemas import ErrorFila, SalaIn, SeccionIn, TrasladoIn
 
 COLUMNAS = {
-    "salas": {"obligatorias": ["codigo_sala", "edificio", "piso", "capacidad", "tipo"], "opcionales": ["edificio_x", "edificio_y"]},
+    "salas": {"obligatorias": ["codigo_sala", "edificio", "piso", "capacidad", "tipo"], "opcionales": []},
+    "traslados": {"obligatorias": ["edificio_a", "edificio_b", "minutos"], "opcionales": []},
     "secciones": {"obligatorias": ["curso", "seccion", "inscritos", "nivel", "tipo_sala", "horario"], "opcionales": ["departamento"]},
 }
 # nombre de columna de la planilla → campo del esquema
@@ -58,9 +59,9 @@ def _mensaje_pydantic(e: dict) -> str:
     return e["msg"]
 
 
-def validar(kind: str, df: pd.DataFrame, salas_existentes: dict[str, dict] | None = None) -> tuple[list, list[ErrorFila]]:
+def validar(kind: str, df: pd.DataFrame, salas_existentes: dict[str, dict] | None = None, edificios: set[str] | None = None) -> tuple[list, list[ErrorFila]]:
     """Devuelve (filas válidas como objetos del esquema, errores). Si hay errores, no se carga nada."""
-    esquema = SalaIn if kind == "salas" else SeccionIn
+    esquema = {"salas": SalaIn, "secciones": SeccionIn, "traslados": TrasladoIn}[kind]
     cfg = COLUMNAS[kind]
     errores: list[ErrorFila] = []
 
@@ -85,30 +86,28 @@ def validar(kind: str, df: pd.DataFrame, salas_existentes: dict[str, dict] | Non
 
     # Duplicados
     if kind == "salas":
-        llave = lambda m: m.codigo  # noqa: E731
-        col = "codigo_sala"
+        llave, col = (lambda m: m.codigo), "codigo_sala"
+    elif kind == "secciones":
+        llave, col = (lambda m: (m.curso, m.seccion)), "seccion"
     else:
-        llave = lambda m: (m.curso, m.seccion)  # noqa: E731
-        col = "seccion"
+        llave, col = (lambda m: frozenset((m.edificio_a, m.edificio_b))), "edificio_b"
     cuenta = Counter(llave(m) for _, m in validas)
     vistos = set()
     for n, m in validas:
         k = llave(m)
         if cuenta[k] > 1:
             if k in vistos:
-                errores.append(ErrorFila(fila=n, columna=col, mensaje=f"duplicado: {k}"))
+                errores.append(ErrorFila(fila=n, columna=col, mensaje=f"duplicado: {k if kind != 'traslados' else m.edificio_a + ' – ' + m.edificio_b}"))
             vistos.add(k)
 
-    # Coordenadas incoherentes dentro de un edificio
-    if kind == "salas":
-        coords: dict[str, tuple] = {}
+    # Traslados: origen y destino distintos; ambos edificios deben existir en las salas cargadas
+    if kind == "traslados":
         for n, m in validas:
-            if (m.edificio_x is None) != (m.edificio_y is None):
-                errores.append(ErrorFila(fila=n, columna="edificio_x", mensaje="edificio_x y edificio_y deben venir juntas"))
-            elif m.edificio_x is not None:
-                prev = coords.setdefault(m.edificio, (m.edificio_x, m.edificio_y))
-                if prev != (m.edificio_x, m.edificio_y):
-                    errores.append(ErrorFila(fila=n, columna="edificio_x", mensaje=f"coordenadas distintas para el edificio {m.edificio}"))
+            if m.edificio_a == m.edificio_b:
+                errores.append(ErrorFila(fila=n, columna="edificio_b", mensaje="origen y destino son el mismo edificio (dentro de un edificio el traslado es 0 y no se declara)"))
+            for c, nombre in (("edificio_a", m.edificio_a), ("edificio_b", m.edificio_b)):
+                if edificios is not None and nombre not in edificios:
+                    errores.append(ErrorFila(fila=n, columna=c, mensaje=f"edificio «{nombre}» no existe en las salas cargadas"))
 
     # Secciones: debe existir al menos una sala del tipo pedido con capacidad suficiente
     if kind == "secciones" and salas_existentes is not None:

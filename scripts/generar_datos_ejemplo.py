@@ -10,7 +10,9 @@ from pathlib import Path
 
 import pandas as pd
 
-EDIFICIOS = {"Eléctrica": (0, 0), "Geología": (260, 140), "Central": (120, 40)}
+# Minutos caminando entre edificios (medidos a mano en un caso real; aquí inventados)
+TRASLADOS = {("Eléctrica", "Central"): 4, ("Central", "Geología"): 5, ("Eléctrica", "Geología"): 9}
+ENTRE_COPIAS_MIN = 20  # solo para el caso a escala: «campus» 2, 3… quedan lejos
 SALAS = [  # (código, edificio, piso, capacidad, tipo)
     ("E-101", "Eléctrica", 1, 30, "catedra"), ("E-102", "Eléctrica", 1, 45, "catedra"), ("E-201", "Eléctrica", 2, 60, "catedra"),
     ("E-LAB1", "Eléctrica", 1, 24, "laboratorio"), ("E-LAB2", "Eléctrica", 2, 20, "laboratorio"),
@@ -29,9 +31,12 @@ def generar(salida: Path, factor: int = 1, semilla: int = 7) -> None:
     salas = []
     for i in range(factor):
         for cod, ed, piso, cap, tipo in SALAS:
-            x, y = EDIFICIOS[ed]
             salas.append({"codigo_sala": cod if i == 0 else f"{cod}-{i}", "edificio": ed if i == 0 else f"{ed} {i}",
-                          "piso": piso, "capacidad": cap, "tipo": tipo, "edificio_x": x + 400 * i, "edificio_y": y})
+                          "piso": piso, "capacidad": cap, "tipo": tipo})
+    nombres = lambda ed, i: ed if i == 0 else f"{ed} {i}"  # noqa: E731
+    traslados = [{"edificio_a": nombres(a, i), "edificio_b": nombres(b, i), "minutos": m} for i in range(factor) for (a, b), m in TRASLADOS.items()]
+    todos = [(nombres(ed, i), i) for i in range(factor) for ed in ("Eléctrica", "Geología", "Central")]
+    traslados += [{"edificio_a": a, "edificio_b": b, "minutos": ENTRE_COPIAS_MIN} for j, (a, ia) in enumerate(todos) for b, ib in todos[j + 1:] if ia != ib]
     secciones = []
     for depto, prefijo, n_cursos in [("ELECTRICA", "ELO", 9 * factor), ("GEOLOGIA", "GEO", 8 * factor)]:
         for c in range(n_cursos):
@@ -45,7 +50,8 @@ def generar(salida: Path, factor: int = 1, semilla: int = 7) -> None:
                     "tipo_sala": "laboratorio" if lab else "catedra", "horario": rnd.choice(PATRONES).format(a=a, b=b)})
     pd.DataFrame(salas).to_excel(salida / "salas.xlsx", index=False)
     pd.DataFrame(secciones).to_excel(salida / "secciones.xlsx", index=False)
-    print(f"{len(salas)} salas y {len(secciones)} secciones en {salida}")
+    pd.DataFrame(traslados).to_excel(salida / "traslados.xlsx", index=False)
+    print(f"{len(salas)} salas, {len(secciones)} secciones y {len(traslados)} traslados en {salida}")
 
 
 if __name__ == "__main__":

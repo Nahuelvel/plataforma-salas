@@ -6,6 +6,8 @@
     <div class="card mb-3"><div class="card-header">1 · Carga de datos</div><div class="card-body vstack gap-3">
       <div><label class="form-label">salas.xlsx</label>
         <div class="input-group"><input id="f_salas" type="file" class="form-control" accept=".xlsx,.csv"><button class="btn btn-outline-primary" onclick="subir('salas')">Subir</button></div></div>
+      <div><label class="form-label">traslados.xlsx <span class="text-muted small">(minutos entre edificios; opcional, solo para λ &gt; 0)</span></label>
+        <div class="input-group"><input id="f_traslados" type="file" class="form-control" accept=".xlsx,.csv"><button class="btn btn-outline-primary" onclick="subir('traslados')">Subir</button></div></div>
       <div><label class="form-label">secciones.xlsx · semestre</label>
         <div class="input-group"><input id="semestre" class="form-control" style="max-width:110px" value="2026-1">
         <input id="f_secciones" type="file" class="form-control" accept=".xlsx,.csv"><button class="btn btn-outline-primary" onclick="subir('secciones')">Subir</button></div></div>
@@ -13,7 +15,7 @@
     </div></div>
     <div class="card"><div class="card-header">2 · Asignación</div><div class="card-body vstack gap-3">
       <div><label class="form-label">Departamentos (separados por coma; vacío = todos)</label><input id="deptos" class="form-control" placeholder="ELECTRICA, GEOLOGIA"></div>
-      <div><label class="form-label">Peso λ de distancias (0 = Básico: solo aforo)</label><input id="lam" type="number" min="0" step="0.1" value="0" class="form-control"></div>
+      <div><label class="form-label">Peso λ del traslado, en asientos vacíos por minuto (0 = Básico: solo aforo)</label><input id="lam" type="number" min="0" step="0.1" value="0" class="form-control"></div>
       <button class="btn btn-primary" id="btn_run" onclick="lanzar()">Ejecutar asignación</button>
       <div id="run_res"></div>
     </div></div>
@@ -56,10 +58,10 @@ const fila = (n, v, b) => `<tr><td>${n}</td><td><b>${v ?? "–"}</b></td><td cla
 function mostrar(c) {
   if (c.estado === "error" || c.estado === "infactible") { indicadores.innerHTML = `<div class="alert alert-danger">Corrida ${c.id}: ${c.estado}. ${esc(c.mensaje)}</div>`; return; }
   const i = c.indicadores, b = c.indicadores_base || {};
-  indicadores.innerHTML = `<p>Corrida #${c.id} · estado <b>${c.estado}</b> · ${c.tiempo_s} s</p>
+  indicadores.innerHTML = `<p>Corrida #${c.id} · estado <b>${c.estado}</b> · ${c.tiempo_s} s</p>${c.mensaje ? `<div class="alert alert-warning py-1">${esc(c.mensaje)}</div>` : ""}
    <table class="table table-sm"><thead><tr><th></th><th>Plataforma</th><th>Referencia (primera sala que cabe)</th></tr></thead><tbody>
    ${fila("Asientos vacíos", i.asientos_vacios, b.asientos_vacios)}${fila("Aforo útil (%)", i.aforo_util_pct, b.aforo_util_pct)}
-   ${fila("Distancia promedio (m)", i.distancia_promedio, b.distancia_promedio)}${fila("Choques", i.choques, b.choques)}</tbody></table>`;
+   ${fila("Traslado promedio (min)", i.traslado_promedio_min, b.traslado_promedio_min)}${fila("Choques", i.choques, b.choques)}</tbody></table>`;
   lnk_excel.href = `/api/corridas/${c.id}/excel`; lnk_excel.classList.remove("d-none");
   const cols = [...new Set(c.malla.map(a => a.bloque))].sort(), salas = [...new Set(c.malla.map(a => a.sala))].sort();
   const celda = {}; c.malla.forEach(a => celda[a.sala + "|" + a.bloque] = a);

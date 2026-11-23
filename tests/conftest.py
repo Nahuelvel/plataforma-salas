@@ -58,6 +58,7 @@ def subir(client, tipo, contenido: bytes, nombre="planilla.xlsx", semestre="2026
 def cargado(client):
     """Cliente con las planillas de ejemplo (Eléctrica + Geología) ya cargadas."""
     assert subir(client, "salas", (EJEMPLO / "salas.xlsx").read_bytes()).json()["ok"]
+    assert subir(client, "traslados", (EJEMPLO / "traslados.xlsx").read_bytes()).json()["ok"]
     assert subir(client, "secciones", (EJEMPLO / "secciones.xlsx").read_bytes()).json()["ok"]
     return client
 
