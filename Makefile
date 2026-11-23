@@ -1,6 +1,9 @@
 .PHONY: instalar test lint correr ejemplo docker
-instalar:   ## crea .venv e instala dependencias
-	python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+# OR-Tools aún no publica paquetes para Python 3.14+. Usa 3.12 o 3.13:  make instalar PYTHON=python3.13
+PYTHON ?= python3
+instalar:   ## crea .venv e instala dependencias (Python 3.12 o 3.13)
+	@$(PYTHON) -c "import sys; assert (3,12) <= sys.version_info[:2] <= (3,13), 'Se necesita Python 3.12 o 3.13 (tienes ' + sys.version.split()[0] + '). Usa: make instalar PYTHON=python3.13'"
+	$(PYTHON) -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 test:       ## pruebas ATP automáticas (PA-01…PA-05 y QR)
 	.venv/bin/python -m pytest
 lint:
